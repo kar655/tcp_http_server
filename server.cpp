@@ -1,5 +1,7 @@
 #include <iostream>
 #include <dirent.h>
+#include <fstream>
+#include "CorrelatedServer.h"
 
 #define EXIT_FAILURE 1
 
@@ -19,13 +21,14 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    FILE *correlated_servers = fopen(argv[2], "r");
-    if (correlated_servers == nullptr) {
+    std::fstream correlated_servers;
+    correlated_servers.open(argv[2], std::fstream::in);
+    if (!correlated_servers.is_open()) {
         printf("Can't read file %s\n", argv[2]);
         return EXIT_FAILURE;
     }
 
-    // File with correlated servers
+    CorrelatedServer correlatedServer(correlated_servers);
 
     // Set port
     uint16_t port = 8080;

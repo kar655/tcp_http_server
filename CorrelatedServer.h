@@ -9,6 +9,7 @@
 
 class CorrelatedServer {
 private:
+    // pair <resource, parsed http>
     std::vector<std::pair<std::string, std::string>> parsed;
 public:
     explicit CorrelatedServer(std::fstream &file): parsed() {
