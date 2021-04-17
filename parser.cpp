@@ -24,78 +24,55 @@ namespace {
 }
 
 void parseStartLine(const std::string &line, RequestHTTP &request) {
-//    std::cout << "got: '" << line << "'" << std::endl;
 
     static const std::regex startLineRegex{
             R"((GET|HEAD) ([a-zA-Z0-9.-/]+) HTTP/1.1\r\n)"};
-    // TODO chyba dowolne zamias get head i potem sprawdzac
+
     std::smatch matchResults;
 
     if (std::regex_match(line, matchResults, startLineRegex)) {
-//        printAllSmatch(matchResults);
 
-        std::cout << "Parsing results: method='" << matchResults[1]
-                  << "' target='" << matchResults[2] << "'" << std::endl;
-
-        auto res = splitPath(matchResults[2].str());
-        std::cout << "path = " << res.first << " file = " << res.second << std::endl;
+//        auto res = splitPath(matchResults[2].str());
+//        std::cout << "path = " << res.first << " file = " << res.second << std::endl;
         request.setStartLine(matchResults[1].str(), matchResults[2].str());
     }
     else {
-        std::cout << "PARSING ERROR!" << std::endl;
-//        exit(1);
+        std::cout << "PARSING ERROR1!" << line << std::endl;
     }
 }
 
 void parseHeaderField(const std::string &line, RequestHTTP &request) {
-//    std::cout << "got: '" << line << "'" << std::endl;
-
     static const std::regex headerFieldRegex{
             R"((\w+): *(\w*) *)"};
-//    static const std::regex headerFieldRegex{
-//            R"(((\w+):\ *(\w*)\ *)*)"};
     std::smatch matchResults;
 
     if (std::regex_match(line, matchResults, headerFieldRegex)) {
-        std::cout << "Parsing results: field-name='" << matchResults[1]
-                  << "' field-value='" << matchResults[2] << "'" << std::endl;
+//        std::cout << "Parsing results: field-name='" << matchResults[1]
+//                  << "' field-value='" << matchResults[2] << "'" << std::endl;
         request.addHeaderField(matchResults[1].str(), matchResults[2].str());
     }
     else {
-        std::cout << "PARSING ERROR!" << std::endl;
+        std::cout << "PARSING ERROR!2" << line << std::endl;
     }
 }
 
 
 bool parseMultiHeaderFields(const std::string &line, RequestHTTP &request) {
-//    static const std::regex headerFieldsRegex{
-//            R"((?:(\w+): *(\w+) *)?\r\n)"};
     static const std::regex headerFieldsRegex{
             R"(([\w: ]+)?\r\n)"};
 
     std::smatch matchResults;
 
-//    if (std::regex_match(line, matchResults, headerFieldsRegex)) {
-//        std::cout << "Parsing MULTI results: '\n";
-//        for (auto iter = matchResults.begin(); iter != matchResults.end(); ++iter) {
-////            parseHeaderField(*iter);
-//            std::cout << "will sent '" << *iter << "' below" << std::endl;
-//        }
-//        std::cout << "'" << std::endl;
-//    }
-//    else {
-//        std::cout << "PARSING ERROR!!!!!!!!!!!!!!!!!!!!!!!!!!!!!111" << std::endl;
-//    }
 
-    bool result = true; //
+    bool result = true;
 
     for (auto iter = std::sregex_iterator(line.begin(), line.end(), headerFieldsRegex);
          iter != std::sregex_iterator(); ++iter) {
-//        std::cout << "got: " << iter->str(1) << " dawd " << iter->str(2) << std::endl;
         result = not iter->str(1).empty();
         std::cout << "got: " << iter->str(1) << std::endl;
-        parseHeaderField(iter->str(1), request);
-
+        if (!iter->str(1).empty()) {
+            parseHeaderField(iter->str(1), request);
+        }
     }
 
     return result;
@@ -153,28 +130,39 @@ std::pair<std::string, std::string> getUntilCRLF(const std::string &line) {
 
 
 bool BufferCollector::tryParseRequest(RequestHTTP &request) {
-    auto splitted = getUntilCRLF(buffer);
-    std::cout << "read line first = " << splitted.first << std::endl;
+    if (currentStep < 2) { // looking for crlf
+        auto splitted = getUntilCRLF(buffer);
+//        std::cout << "read line first = " << splitted.first << std::endl;
 
-    if (currentStep == 0) {
-        parseStartLine(splitted.first, request);
-        ++currentStep;
-    }
-    else if (currentStep == 1) {
-        if (!parseMultiHeaderFields(splitted.first, request)) {
+        if (currentStep == 0) {
+            parseStartLine(splitted.first, request);
             ++currentStep;
         }
-    }
-    else {
-        std::cout << "message-body = " << splitted.first << std::endl;
-    }
+        else {
+            if (!parseMultiHeaderFields(splitted.first, request)) {
+                ++currentStep;
+                request.setReadAllFields();
+            }
+        }
 
-    buffer = splitted.second;
-    if (buffer.empty()) {
-        std::cout << "FOUND ALL CRLF" << std::endl;
-        return false;
+        buffer = splitted.second;
+        if (buffer.empty()) {
+//            std::cout << "FOUND ALL CRLF" << std::endl;
+            return false;
+        }
     }
-
+    else { // looking for number of characters for message body
+        size_t bufferSize = buffer.length();
+        if (bufferSize <= request.missingMessageBodyLength()) {
+            request.addMessageBody(buffer);
+            buffer.clear();
+        }
+        else if (!request.messageBodyReady()) {
+            std::string left = buffer.substr(request.missingMessageBodyLength());
+            request.addMessageBody(buffer.substr(0, request.missingMessageBodyLength()));
+            buffer = std::move(left);
+        }
+    }
 
     return true;
 }

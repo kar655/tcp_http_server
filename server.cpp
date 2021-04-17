@@ -40,25 +40,24 @@ void syserr(const char *fmt, ...) {
 }
 
 int main(int argc, char *argv[]) {
-    // serwer <nazwa-katalogu-z-plikami> <plik-z-serwerami-skorelowanymi> [<numer-portu-serwera>]
     if (argc != 3 && argc != 4) {
-        printf("Usage: %s <nazwa-katalogu-z-plikami> "
-               "<plik-z-serwerami-skorelowanymi> [<numer-portu-serwera>]\n",
-               argv[0]);
+        std::cerr << "Usage: " << argv[0]
+                  << " <nazwa-katalogu-z-plikami> <plik-z-serwerami-skorelowanymi> [<numer-portu-serwera>]"
+                  << std::endl;
         return EXIT_FAILURE;
     }
 
     // Directory with sources
     DIR *sources = opendir(argv[1]);
     if (sources == nullptr) {
-        printf("Can't open directory %s\n", argv[1]);
+        std::cerr << "Can't open directory " << argv[1] << std::endl;
         return EXIT_FAILURE;
     }
 
     std::fstream correlated_servers;
     correlated_servers.open(argv[2], std::fstream::in);
     if (!correlated_servers.is_open()) {
-        printf("Can't read file %s\n", argv[2]);
+        std::cerr << "Can't read file " << argv[2] << std::endl;
         return EXIT_FAILURE;
     }
 
@@ -69,7 +68,7 @@ int main(int argc, char *argv[]) {
     if (argc == 4) {
         port = std::stoi(argv[3]);
     }
-    printf("Using port %d\n", port);
+    std::cout << "Using port " << port << std::endl;
 
 
     std::string collectedBuffer;
@@ -120,10 +119,14 @@ int main(int argc, char *argv[]) {
                 syserr("reading from client socket");
             else {
                 printf("read from socket: %zd bytes\n", len);
-                printf("%.*s\n", (int) len, buffer);
+//                printf("%.*s\n", (int) len, buffer);
 
                 bufferCollector.getNewPortion(buffer);
                 while (bufferCollector.tryParseRequest(currentRequest)) {}
+
+                if (currentRequest.messageBodyReady()) {
+                    std::cout << "READY!" << std::endl << currentRequest << std::endl;
+                }
 
 //                buffer[len - 1] = 0; // TODO remove \n
 //                parseStartLine(buffer);
