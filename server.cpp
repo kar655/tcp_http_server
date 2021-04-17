@@ -4,6 +4,10 @@
 #include <netinet/in.h>
 #include <unistd.h>
 #include "CorrelatedServer.h"
+#include "parser.h"
+#include <regex>
+#include "responses.h"
+#include "request.h"
 
 #define BUFFER_SIZE   2000
 #define QUEUE_LENGTH     5
@@ -22,8 +26,8 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
-void syserr(const char *fmt, ...)
-{
+
+void syserr(const char *fmt, ...) {
     va_list fmt_args;
     int errno1 = errno;
 
@@ -68,6 +72,9 @@ int main(int argc, char *argv[]) {
     printf("Using port %d\n", port);
 
 
+    std::string collectedBuffer;
+    BufferCollector bufferCollector;
+    RequestHTTP currentRequest;
     // ------------------------- TCP CONNECTION ---------------------------
 
     int sock, msg_sock;
@@ -107,12 +114,20 @@ int main(int argc, char *argv[]) {
         if (msg_sock < 0)
             syserr("accept");
         do {
+            memset(buffer, 0, sizeof(buffer));
             len = read(msg_sock, buffer, sizeof(buffer));
             if (len < 0)
                 syserr("reading from client socket");
             else {
                 printf("read from socket: %zd bytes\n", len);
                 printf("%.*s\n", (int) len, buffer);
+
+                bufferCollector.getNewPortion(buffer);
+                while (bufferCollector.tryParseRequest(currentRequest)) {}
+
+//                buffer[len - 1] = 0; // TODO remove \n
+//                parseStartLine(buffer);
+//                parseHeaderField(buffer);
 
                 snd_len = write(msg_sock, buffer, len);
                 if (snd_len != len)

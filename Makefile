@@ -6,8 +6,14 @@ CFLAGS  = -g -Wall -Wextra
 all: server
 
 
-server: server.cpp
-	$(CC) $(CFLAGS) -o server server.cpp
+server: server.cpp parser.o request.o
+	$(CC) $(CFLAGS) -o server server.cpp parser.o request.o
+
+parser.o: parser.cpp parser.h
+	$(CC) $(CFLAGS) -c parser.cpp
+
+request.o: request.cpp request.h
+	$(CC) $(CFLAGS) -c request.cpp
 
 #count:  countwords.o counter.o scanner.o
 #	$(CC) $(CFLAGS) -o count countwords.o counter.o scanner.o
