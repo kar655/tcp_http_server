@@ -79,8 +79,11 @@ public:
     explicit RequestHandler(const RequestHTTP &requestHttp)
             : statusCode(0), requestHttp(requestHttp), response("HTTP/1.1 ") {}
 
-    std::string prepareResponse(const CorrelatedServer &correlatedServer) {
-        std::ifstream file(requestHttp.target);
+    std::string prepareResponse(const CorrelatedServer &correlatedServer,
+                                const std::string &folderPath) {
+        std::string filePath = folderPath + requestHttp.target;
+        std::cout << "Trying to open path: " << filePath << std::endl;
+        std::ifstream file(filePath);
 
         if (!file.is_open()) {
             std::string parsedServer = correlatedServer.findResource(requestHttp.target);
@@ -88,18 +91,21 @@ public:
                 response += "404 Not found";
             }
             else {
-                response += "302 " + parsedServer;
+                response += "302 Moved to " + parsedServer;
             }
         }
         else {
-            std::string fileContent;
+            // Read whole file
+            std::string fileContent(std::istreambuf_iterator<char>(file), {});
             response += "200 OK\r\n";
-            file >> fileContent;
+            response += "Content-Type: application/octet-stream\r\n";
             response += "Content-length: ";
             response += std::to_string(fileContent.length());
             response += "\r\n";
-            response += "message body: ";
-            response += fileContent;
+            if (requestHttp.method == "GET") {
+                response += "message body: ";
+                response += fileContent;
+            }
         }
 
         response += "\r\n";

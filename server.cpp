@@ -49,6 +49,7 @@ int main(int argc, char *argv[]) {
 
     // Directory with sources
     DIR *sources = opendir(argv[1]);
+    std::string folderPath(argv[1]);
     if (sources == nullptr) {
         std::cerr << "Can't open directory " << argv[1] << std::endl;
         return EXIT_FAILURE;
@@ -137,7 +138,7 @@ int main(int argc, char *argv[]) {
                         bufferCollector.resetCurrentStep();
                         std::cout << "READY!" << std::endl << currentRequest << std::endl;
                         RequestHandler request(currentRequest);
-                        std::string response = request.prepareResponse(correlatedServer);
+                        std::string response = request.prepareResponse(correlatedServer, folderPath);
 
                         std::cout << "RESPONSE: '''" << response << "'''" << std::endl;
 
