@@ -13,6 +13,7 @@ namespace {
         if (std::regex_match(path, matchResults, splitPathRegex)) {
             return {matchResults[1].str(), matchResults[2].str()};
         }
+        assert(false);
         return {};
     }
 }
@@ -58,17 +59,31 @@ bool parseMultiHeaderFields(const std::string &line, RequestHTTP &request) {
     // if one is empty it means its end of fields
 
     // todo nie lepiej match ???
-    for (auto iter = std::sregex_iterator(line.begin(), line.end(), headerFieldsRegex);
-         iter != std::sregex_iterator(); ++iter) {
-        std::cout << "got: " << iter->str(1) << std::endl;
-        if (!iter->str(1).empty()) {
-            std::cout << "Adding header field\n";
-            parseHeaderField(iter->str(1), request);
-        }
-        else {
+//    for (auto iter = std::sregex_iterator(line.begin(), line.end(), headerFieldsRegex);
+//         iter != std::sregex_iterator(); ++iter) {
+//        std::cout << "got: " << iter->str(1) << std::endl;
+//        if (!iter->str(1).empty()) {
+//            std::cout << "Adding header field\n";
+//            parseHeaderField(iter->str(1), request);
+//        }
+//        else {
+//            std::cout << "empty field\n";
+//            return false;
+//        }
+//    }
+    if (std::regex_match(line, matchResults, headerFieldsRegex)) {
+        std::string result = matchResults[1].str();
+
+        if (result.empty()) {
             std::cout << "empty field\n";
             return false;
         }
+
+        parseHeaderField(result, request);
+    }
+    else {
+        std::cout << "PARSING ERROR!2'" << line << "'" << std::endl;
+        assert(false);
     }
 
     return true;
@@ -98,6 +113,7 @@ std::pair<std::string, std::string> getUntilCRLF(const std::string &line) {
 bool BufferCollector::tryParseRequest(RequestHTTP &request) {
     if (currentStep < 2) { // looking for crlf
         auto splitted = getUntilCRLF(buffer);
+        std::cout << "CURRENTLY PARSING '''" << splitted.first << "'''" << std::endl;
 
         if (currentStep == 0) {
             parseStartLine(splitted.first, request);
@@ -111,6 +127,7 @@ bool BufferCollector::tryParseRequest(RequestHTTP &request) {
                 std::cout << "In if parseMulti..." << std::endl;
                 ++currentStep;
                 request.setReadAllFields();
+                buffer = splitted.second;
                 return !request.messageBodyReady();
             }
         }
@@ -122,9 +139,10 @@ bool BufferCollector::tryParseRequest(RequestHTTP &request) {
         }
     }
     else { // looking for number of characters for message body
+//        assert(false);
         std::cout << "Looking for message body" << std::endl;
 
-        //
+
         size_t bufferSize = buffer.length();
         if (bufferSize < request.missingMessageBodyLength()) {
             std::cout << "Not enough message body" << std::endl;
@@ -132,6 +150,8 @@ bool BufferCollector::tryParseRequest(RequestHTTP &request) {
             buffer.clear();
         }
         else {
+            assert(request.missingMessageBodyLength() != 0);
+
             std::cout << "Message body last part" << std::endl;
             std::string left = buffer.substr(request.missingMessageBodyLength());
             request.addMessageBody(buffer.substr(0, request.missingMessageBodyLength()));

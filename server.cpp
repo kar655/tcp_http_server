@@ -114,9 +114,14 @@ int main(int argc, char *argv[]) {
             syserr("accept");
         do {
             memset(buffer, 0, sizeof(buffer));
-            len = read(msg_sock, buffer, sizeof(buffer));
-            if (len < 0)
+            len = read(msg_sock, buffer, sizeof(buffer) - 1);
+            if (len < 0) {
                 syserr("reading from client socket");
+            }
+            else if (len == 0) {
+                std::cout << "len == 0" << std::endl;
+//                break;
+            }
             else {
                 printf("read from socket: %zd bytes\n", len);
 //                printf("%.*s\n", (int) len, buffer);
@@ -145,8 +150,9 @@ int main(int argc, char *argv[]) {
 //                if (snd_len != len)
 //                    syserr("writing to client socket");
             }
+            std::cout << "len > 0 === " << (len > 0) << std::endl;
         } while (len > 0);
-        printf("ending connection\n");
+        std::cout << "ending connection\n";
         if (close(msg_sock) < 0)
             syserr("close");
     }
