@@ -122,9 +122,12 @@ int main(int argc, char *argv[]) {
 //                printf("%.*s\n", (int) len, buffer);
 
                 bufferCollector.getNewPortion(buffer);
-                while (bufferCollector.tryParseRequest(currentRequest)) {}
-
+                while (bufferCollector.tryParseRequest(currentRequest)) {
+                    std::cout << "LOOP" << std::endl;
+                }
+                std::cout << "Out of loop!" << std::endl;
                 if (currentRequest.messageBodyReady()) {
+                    bufferCollector.resetCurrentStep();
                     std::cout << "READY!" << std::endl << currentRequest << std::endl;
                     RequestHandler request(currentRequest);
                     std::string response = request.prepareResponse(correlatedServer);
@@ -134,11 +137,13 @@ int main(int argc, char *argv[]) {
                     snd_len = write(msg_sock, response.c_str(), response.size());
                     if (snd_len != response.size())
                         syserr("writing to client socket");
+
+                    currentRequest = RequestHTTP();
                 }
 
-                snd_len = write(msg_sock, buffer, len);
-                if (snd_len != len)
-                    syserr("writing to client socket");
+//                snd_len = write(msg_sock, buffer, len);
+//                if (snd_len != len)
+//                    syserr("writing to client socket");
             }
         } while (len > 0);
         printf("ending connection\n");

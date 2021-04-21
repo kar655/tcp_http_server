@@ -29,6 +29,7 @@ public:
 
     bool tryParseRequest(RequestHTTP &request);
     void getNewPortion(const std::string &line);
+    void resetCurrentStep();
 };
 
 void parseStartLine(const std::string &line, RequestHTTP &request);

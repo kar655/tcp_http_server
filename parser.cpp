@@ -1,15 +1,9 @@
 #include <regex>
 #include <iostream>
+#include <assert.h>
 #include "parser.h"
 
 namespace {
-    void printAllSmatch(const std::smatch &smatch) {
-        for (const auto &match : smatch) {
-            std::cout << "match: '" << match << "' ";
-        }
-        std::cout << std::endl;
-    }
-
     std::pair<std::string, std::string> splitPath(const std::string &path) {
         static const std::regex splitPathRegex{
                 R"(([a-zA-Z0-9.-/]*)/([a-zA-Z0-9.-/]+))"};
@@ -31,13 +25,11 @@ void parseStartLine(const std::string &line, RequestHTTP &request) {
     std::smatch matchResults;
 
     if (std::regex_match(line, matchResults, startLineRegex)) {
-
-//        auto res = splitPath(matchResults[2].str());
-//        std::cout << "path = " << res.first << " file = " << res.second << std::endl;
         request.setStartLine(matchResults[1].str(), matchResults[2].str());
     }
     else {
-        std::cout << "PARSING ERROR1!" << line << std::endl;
+        std::cout << "PARSING ERROR1!'" << line << "'" << std::endl;
+        assert(false);
     }
 }
 
@@ -47,12 +39,11 @@ void parseHeaderField(const std::string &line, RequestHTTP &request) {
     std::smatch matchResults;
 
     if (std::regex_match(line, matchResults, headerFieldRegex)) {
-//        std::cout << "Parsing results: field-name='" << matchResults[1]
-//                  << "' field-value='" << matchResults[2] << "'" << std::endl;
         request.addHeaderField(matchResults[1].str(), matchResults[2].str());
     }
     else {
-        std::cout << "PARSING ERROR!2" << line << std::endl;
+        std::cout << "PARSING ERROR!2'" << line << "'" << std::endl;
+        assert(false);
     }
 }
 
@@ -64,49 +55,23 @@ bool parseMultiHeaderFields(const std::string &line, RequestHTTP &request) {
     std::smatch matchResults;
 
 
-    bool result = true;
+    // if one is empty it means its end of fields
 
+    // todo nie lepiej match ???
     for (auto iter = std::sregex_iterator(line.begin(), line.end(), headerFieldsRegex);
          iter != std::sregex_iterator(); ++iter) {
-        result = not iter->str(1).empty();
         std::cout << "got: " << iter->str(1) << std::endl;
         if (!iter->str(1).empty()) {
+            std::cout << "Adding header field\n";
             parseHeaderField(iter->str(1), request);
+        }
+        else {
+            std::cout << "empty field\n";
+            return false;
         }
     }
 
-    return result;
-}
-
-void testRandom(const std::string &line2) {
-
-    static const std::regex headerFieldsRegex{
-            R"((?:(\w)+-?)+?)"};
-//    static const std::regex headerFieldsRegex{
-//            R"((?:(\w)*-?)+?)"};
-
-    std::smatch matchResults;
-    std::string line{line2};
-
-//    while (std::regex_search(line, matchResults, headerFieldsRegex)) {
-////        std::cout << "Found size = " << matchResults.size() << std::endl;
-////        std::cout << "Prefix: " << matchResults.prefix() << std::endl;
-////        for (const auto &match : matchResults) {
-////            std::cout << "'" << match << "'" << std::endl;
-////        }
-////        std::cout << "Suffix: " << matchResults.suffix();
-//        std::cout << matchResults[1] << std::endl;
-//        line = matchResults.suffix();
-//        if (line.empty()) {
-//            break;
-//        }
-//    }
-
-    for (auto iter = std::sregex_iterator(line.begin(), line.end(), headerFieldsRegex);
-         iter != std::sregex_iterator(); ++iter) {
-//        std::smatch match = *iter;
-        std::cout << "got: " << iter->str(1) << std::endl;
-    }
+    return true;
 }
 
 std::pair<std::string, std::string> getUntilCRLF(const std::string &line) {
@@ -114,6 +79,7 @@ std::pair<std::string, std::string> getUntilCRLF(const std::string &line) {
     if (position != std::string::npos) {
         return {line.substr(0, position + 2), line.substr(position + 2)};
     }
+    assert(false);
     return {"", line};
 }
 
@@ -132,36 +98,47 @@ std::pair<std::string, std::string> getUntilCRLF(const std::string &line) {
 bool BufferCollector::tryParseRequest(RequestHTTP &request) {
     if (currentStep < 2) { // looking for crlf
         auto splitted = getUntilCRLF(buffer);
-//        std::cout << "read line first = " << splitted.first << std::endl;
 
         if (currentStep == 0) {
             parseStartLine(splitted.first, request);
             ++currentStep;
+            std::cout << "Parsed start line" << std::endl;
         }
         else {
+            // false if it was last field (empty \r\n)
+            std::cout << "Before multi header fields\n";
             if (!parseMultiHeaderFields(splitted.first, request)) {
+                std::cout << "In if parseMulti..." << std::endl;
                 ++currentStep;
                 request.setReadAllFields();
+                return !request.messageBodyReady();
             }
         }
 
         buffer = splitted.second;
         if (buffer.empty()) {
-//            std::cout << "FOUND ALL CRLF" << std::endl;
+            std::cout << "FOUND ALL NEEDED CRLF" << std::endl;
             return false;
         }
     }
     else { // looking for number of characters for message body
+        std::cout << "Looking for message body" << std::endl;
+
+        //
         size_t bufferSize = buffer.length();
-        if (bufferSize <= request.missingMessageBodyLength()) {
+        if (bufferSize < request.missingMessageBodyLength()) {
+            std::cout << "Not enough message body" << std::endl;
             request.addMessageBody(buffer);
             buffer.clear();
         }
-        else if (!request.messageBodyReady()) {
+        else {
+            std::cout << "Message body last part" << std::endl;
             std::string left = buffer.substr(request.missingMessageBodyLength());
             request.addMessageBody(buffer.substr(0, request.missingMessageBodyLength()));
             buffer = std::move(left);
         }
+
+        return false;
     }
 
     return true;
@@ -169,4 +146,8 @@ bool BufferCollector::tryParseRequest(RequestHTTP &request) {
 
 void BufferCollector::getNewPortion(const std::string &line) {
     buffer += line;
+}
+
+void BufferCollector::resetCurrentStep() {
+    currentStep = 0;
 }
