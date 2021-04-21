@@ -126,11 +126,15 @@ int main(int argc, char *argv[]) {
 
                 if (currentRequest.messageBodyReady()) {
                     std::cout << "READY!" << std::endl << currentRequest << std::endl;
-                }
+                    RequestHandler request(currentRequest);
+                    std::string response = request.prepareResponse(correlatedServer);
 
-//                buffer[len - 1] = 0; // TODO remove \n
-//                parseStartLine(buffer);
-//                parseHeaderField(buffer);
+                    std::cout << "RESPONSE: '''" << response << "'''" << std::endl;
+
+                    snd_len = write(msg_sock, response.c_str(), response.size());
+                    if (snd_len != response.size())
+                        syserr("writing to client socket");
+                }
 
                 snd_len = write(msg_sock, buffer, len);
                 if (snd_len != len)

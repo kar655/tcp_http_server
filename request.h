@@ -5,6 +5,11 @@
 #include <unordered_map>
 #include <algorithm>
 #include <iostream>
+#include <fstream>
+#include "CorrelatedServer.h"
+
+
+class RequestHandler;
 
 class RequestHTTP {
 private:
@@ -47,7 +52,7 @@ public:
         return iter != headerFields.end() ? std::stoi(iter->second) : 0;
     }
 
-    size_t missingMessageBodyLength () {
+    size_t missingMessageBodyLength() {
         return messageBodyLength() - messageBody.length();
     }
 
@@ -60,6 +65,47 @@ public:
     }
 
     friend std::ostream &operator<<(std::ostream &os, const RequestHTTP &request);
+
+    friend class RequestHandler;
+};
+
+class RequestHandler {
+private:
+    uint_fast16_t statusCode;
+    const RequestHTTP &requestHttp;
+    std::string response;
+
+public:
+    explicit RequestHandler(const RequestHTTP &requestHttp)
+            : statusCode(0), requestHttp(requestHttp), response("HTTP/1.1 ") {}
+
+    std::string prepareResponse(const CorrelatedServer &correlatedServer) {
+        std::ifstream file(requestHttp.target);
+
+        if (!file.is_open()) {
+            std::string parsedServer = correlatedServer.findResource(requestHttp.target);
+            if (parsedServer.empty()) {
+                response += "404 Not found";
+            }
+            else {
+                response += "302 " + parsedServer;
+            }
+        }
+        else {
+            std::string fileContent;
+            response += "200 OK\r\n";
+            file >> fileContent;
+            response += "Content-length: ";
+            response += std::to_string(fileContent.length());
+            response += "\r\n";
+            response += "message body: ";
+            response += fileContent;
+        }
+
+        response += "\r\n";
+
+        return response;
+    }
 };
 
 #endif //ZAD1CPP_REQUEST_H
