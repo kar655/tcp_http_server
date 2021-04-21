@@ -20,16 +20,21 @@ class BufferCollector {
 private:
     std::string buffer;
     uint_fast8_t currentStep;
+    bool incomplete;
     // 0 - start line
     // 1 - header fields
     // 2 - message_body
 public:
 
-    BufferCollector(): buffer(), currentStep(0) {}
+    BufferCollector(): buffer(), currentStep(0), incomplete(false) {}
 
     bool tryParseRequest(RequestHTTP &request);
     void getNewPortion(const std::string &line);
     void resetCurrentStep();
+    bool empty() const;
+    void resetIncomplete();
+    void setIncomplete();
+    bool isIncomplete() const;
 };
 
 void parseStartLine(const std::string &line, RequestHTTP &request);

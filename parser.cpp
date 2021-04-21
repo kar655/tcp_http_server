@@ -94,7 +94,7 @@ std::pair<std::string, std::string> getUntilCRLF(const std::string &line) {
     if (position != std::string::npos) {
         return {line.substr(0, position + 2), line.substr(position + 2)};
     }
-    assert(false);
+//    assert(false);
     return {"", line};
 }
 
@@ -113,6 +113,11 @@ std::pair<std::string, std::string> getUntilCRLF(const std::string &line) {
 bool BufferCollector::tryParseRequest(RequestHTTP &request) {
     if (currentStep < 2) { // looking for crlf
         auto splitted = getUntilCRLF(buffer);
+        if (splitted.first.empty()) {
+            setIncomplete();
+            return false;
+        }
+
         std::cout << "CURRENTLY PARSING '''" << splitted.first << "'''" << std::endl;
 
         if (currentStep == 0) {
@@ -171,3 +176,21 @@ void BufferCollector::getNewPortion(const std::string &line) {
 void BufferCollector::resetCurrentStep() {
     currentStep = 0;
 }
+
+bool BufferCollector::empty() const {
+    return buffer.empty();
+}
+
+void BufferCollector::resetIncomplete() {
+    incomplete = false;
+}
+
+void BufferCollector::setIncomplete() {
+    incomplete = true;
+}
+
+
+bool BufferCollector::isIncomplete() const {
+    return incomplete;
+}
+
