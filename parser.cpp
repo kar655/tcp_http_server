@@ -28,12 +28,16 @@ void parseStartLine(const std::string &line, RequestHTTP &request) {
 
     if (std::regex_match(line, matchResults, startLineRegex)) {
         std::string method = matchResults[1].str();
-        if (method == "GET" || method == "HEAD") {
-            request.setStartLine(matchResults[1].str(), matchResults[2].str());
+//        if (method == "GET" || method == "HEAD") {
+        std::string target = matchResults[2].str();
+        if (target.empty() || target[0] != '/') {
+            throw ExceptionResponse(USER_ERROR, "Not accepted format - target path");
         }
-        else {
-            throw ExceptionResponse(NOT_IMPLEMENTED, "Not implemented functionality");
-        }
+        request.setStartLine(matchResults[1].str(), std::move(target));
+//        }
+//        else {
+//            throw ExceptionResponse(NOT_IMPLEMENTED, "Not implemented functionality");
+//        }
     }
     else {
         std::cout << "PARSING ERROR1!'" << line << "'" << std::endl;

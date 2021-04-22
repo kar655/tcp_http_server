@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <iostream>
 #include <fstream>
+#include <utility>
 #include "CorrelatedServer.h"
 
 #define SUCCESS 200
@@ -52,21 +53,20 @@ private:
     }
 
 public:
-    void setStartLine(const std::string &method, const std::string &target) {
-        this->method = method;
-        this->target = target;
+    void setStartLine(std::string passedMethod, std::string passedTarget) {
+        this->method = std::move(passedMethod);
+        this->target = std::move(passedTarget);
     }
 
-    bool addHeaderField(std::string name, const std::string &value) {
+    void addHeaderField(std::string name, const std::string &value) {
         stringToLowercase(name);
         auto iter = headerFields.find(name);
+
         if (iter != headerFields.end()) {
-            // Duplicated field
-            return false;
+            throw ExceptionResponse(400, "Duplicated header field");
         }
 
-        headerFields[name] = value;
-        return true;
+        headerFields[std::move(name)] = value;
     }
 
     void addMessageBody(const std::string &body) {
@@ -107,11 +107,17 @@ public:
 
     std::string prepareResponse(const CorrelatedServer &correlatedServer,
                                 const std::string &folderPath) {
+        if (requestHttp.method != "GET" && requestHttp.method != "HEAD") {
+            response += std::to_string(NOT_IMPLEMENTED);
+            response += " Not implemented functionality\r\n";
+            return response;
+        }
+
         std::string filePath = folderPath + requestHttp.target;
         std::cout << "Trying to open path: " << filePath << std::endl;
         std::ifstream file(filePath);
 
-        if (!file.is_open()) {
+        if (!file.is_open() || !file.good()) {
             std::string parsedServer = correlatedServer.findResource(requestHttp.target);
             if (parsedServer.empty()) {
                 response += "404 Not found";
@@ -122,7 +128,15 @@ public:
         }
         else {
             // Read whole file
-            std::string fileContent(std::istreambuf_iterator<char>(file), {});
+            std::cout << "reading file??" << std::endl;
+            std::string fileContent;
+            try {
+                fileContent = std::string(std::istreambuf_iterator<char>(file), {});
+            }
+            catch (std::exception &exception) {
+                response += "404 Can't open directory\r\n"; // TODO czy nie powinienem sprawdzic w corelated?
+                return response;
+            }
             response += "200 OK\r\n";
             response += "Content-Type: application/octet-stream\r\n";
             response += "Content-length: ";
