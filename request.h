@@ -3,6 +3,7 @@
 
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <algorithm>
 #include <iostream>
 #include <fstream>
@@ -16,18 +17,22 @@
 #define SERVER_ERROR 500
 #define NOT_IMPLEMENTED 501
 
+class CloseConnection : public std::exception {
+};
 
 class ExceptionResponse : public std::exception {
 protected:
     const int code;
     std::string response;
 public:
-    explicit ExceptionResponse(int code, const std::string &reason)
+    explicit ExceptionResponse(int code, const std::string &reason,
+                               const std::string &append = "\r\n")
             : code(code), response("HTTP/1.1 ") {
         response += std::to_string(code);
         response += " ";
         response += reason;
         response += "\r\n";
+        response += append;
     }
 
     size_t size() const noexcept {
@@ -43,13 +48,15 @@ public:
 //    }
 };
 
-class ExceptionResponseServerSide : public ExceptionResponse {};
+class ExceptionResponseServerSide : public ExceptionResponse {
+};
 
 class ExceptionResponseUserSide : public ExceptionResponse {
 public:
     ExceptionResponseUserSide(const std::string &reason)
-            : ExceptionResponse(USER_ERROR, reason) {
+            : ExceptionResponse(USER_ERROR, reason, "") {
         response += "Connection: close\r\n";
+        response += "\r\n";
     }
 };
 
@@ -60,6 +67,8 @@ private:
     std::string method;
     std::string target;
     std::unordered_map<std::string, std::string> headerFields;
+    const std::unordered_set<std::string> handled =
+            {"connection", "content-type", "content-length", "server"};
     std::string messageBody;
     bool readAllFields = false;
 
@@ -67,6 +76,10 @@ private:
         std::transform(line.begin(), line.end(), line.begin(), [](unsigned char c) {
             return std::tolower(c);
         });
+    }
+
+    bool isHandled(const std::string &field) const {
+        return handled.find(field) != handled.end();
     }
 
 public:
@@ -77,6 +90,10 @@ public:
 
     void addHeaderField(std::string name, const std::string &value) {
         stringToLowercase(name);
+        if (!isHandled(name)) {
+            return;
+        }
+
         auto iter = headerFields.find(name);
 
         if (iter != headerFields.end()) {
@@ -107,6 +124,11 @@ public:
         readAllFields = true;
     }
 
+    bool isClosing() const {
+        auto iter = headerFields.find("connection");
+        return iter != headerFields.end() && iter->second == "close";
+    }
+
     friend std::ostream &operator<<(std::ostream &os, const RequestHTTP &request);
 
     friend class RequestHandler;
@@ -126,10 +148,11 @@ public:
                                 const std::string &folderPath) {
         if (requestHttp.method != "GET" && requestHttp.method != "HEAD") {
             response += std::to_string(NOT_IMPLEMENTED);
-            response += " Not implemented functionality\r\n";
+            response += " Not implemented functionality\r\n\r\n";
             return response;
         }
 
+        std::string fileContent;
         std::string filePath = folderPath + requestHttp.target;
         std::cout << "Trying to open path: " << filePath << std::endl;
         std::ifstream file(filePath);
@@ -137,21 +160,27 @@ public:
         if (!file.is_open() || !file.good()) {
             std::string parsedServer = correlatedServer.findResource(requestHttp.target);
             if (parsedServer.empty()) {
-                response += "404 Not found";
+                response += "404 Not found\r\n";
             }
             else {
-                response += "302 Moved to " + parsedServer;
+                response += "302 Moved\r\n";
+                response += "location: ";
+                response += parsedServer;
+                response += "\r\n";
             }
         }
         else {
             // Read whole file
             std::cout << "reading file??" << std::endl;
-            std::string fileContent;
             try {
                 fileContent = std::string(std::istreambuf_iterator<char>(file), {});
             }
             catch (std::exception &exception) {
                 response += "404 Can't open directory\r\n"; // TODO czy nie powinienem sprawdzic w corelated?
+                if (requestHttp.isClosing()) {
+                    response += "connection: close\r\n";
+                }
+                response += "\r\n";
                 return response;
             }
             response += "200 OK\r\n";
@@ -159,13 +188,25 @@ public:
             response += "Content-length: ";
             response += std::to_string(fileContent.length());
             response += "\r\n";
-            if (requestHttp.method == "GET") {
-                response += "message body: ";
-                response += fileContent;
-            }
+
+//            if (requestHttp.isClosing()) {
+//                response += "connection: close\r\n";
+//            }
+
+//            if (requestHttp.method == "GET") {
+////                response += "message body: ";
+//                response += fileContent;
+//            }
         }
 
+        if (requestHttp.isClosing()) {
+            response += "Connection: close\r\n";
+        }
         response += "\r\n";
+
+        if (requestHttp.method == "GET") {
+            response += fileContent;
+        }
 
         return response;
     }

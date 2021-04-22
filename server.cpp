@@ -3,6 +3,7 @@
 #include <fstream>
 #include <netinet/in.h>
 #include <unistd.h>
+#include <filesystem>
 #include "CorrelatedServer.h"
 #include "parser.h"
 #include <regex>
@@ -12,6 +13,8 @@
 #define BUFFER_SIZE   2000
 #define QUEUE_LENGTH     5
 
+
+namespace fs = std::filesystem;
 
 //#define syserr printf
 
@@ -47,6 +50,22 @@ int main(int argc, char *argv[]) {
         std::cerr << "Can't open directory " << argv[1] << std::endl;
         return EXIT_FAILURE;
     }
+//
+//
+////    std::error_code errorCode;
+//    fs::path sourcesPath = fs::canonical(argv[1]);
+////    std::cout << "File path: " << sourcesPath << std::endl;
+////    if (errorCode) {
+////        std::cerr << "Can't read file " << argv[2] << std::endl;
+////        return EXIT_FAILURE;
+////    }
+//
+//    fs::directory_entry serverDirectory(sourcesPath);
+//    if (!serverDirectory.exists() || !serverDirectory.is_directory()) {
+//        std::cerr << "Can't open directory " << argv[1] << std::endl;
+//        return EXIT_FAILURE;
+//    }
+
 
     std::fstream correlated_servers;
     correlated_servers.open(argv[2], std::fstream::in);
@@ -152,6 +171,10 @@ int main(int argc, char *argv[]) {
                             if (snd_len != response.size())
                                 syserr("writing to client socket");
 
+                            if (currentRequest.isClosing()) {
+                                std::cout << "======closing connection as requested======" << std::endl;
+                                throw CloseConnection();
+                            }
                             currentRequest = RequestHTTP();
                         }
                     }
@@ -167,6 +190,9 @@ int main(int argc, char *argv[]) {
             snd_len = write(msg_sock, exceptionResponse.what(), exceptionResponse.size());
             if (snd_len != exceptionResponse.size())
                 syserr("exception writing");
+        } catch (const CloseConnection &closeConnection) {
+            bufferCollector.clear();
+            currentRequest = RequestHTTP();
         }
         std::cout << "ending connection\n";
         if (close(msg_sock) < 0)

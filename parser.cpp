@@ -22,7 +22,7 @@ void parseStartLine(const std::string &line, RequestHTTP &request) {
 //    static const std::regex startLineRegex{
 //            R"((GET|HEAD) ([a-zA-Z0-9.-/]+) HTTP/1.1\r\n)"};
     static const std::regex startLineRegex{
-            R"((\w+) ([a-zA-Z0-9.-/]+) HTTP/1.1\r\n)"};
+            R"((\w+) ([\w\.\-/]+) HTTP/1.1\r\n)"};
 
     std::smatch matchResults;
 

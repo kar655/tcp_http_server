@@ -1,6 +1,6 @@
 
 CC = g++
-CFLAGS  = -g -Wall -Wextra
+CFLAGS  = -g -Wall -Wextra -std=c++17
 
 
 all: server
