@@ -3,40 +3,47 @@
 #include <assert.h>
 #include "parser.h"
 
-namespace {
-    std::pair<std::string, std::string> splitPath(const std::string &path) {
-        static const std::regex splitPathRegex{
-                R"(([a-zA-Z0-9.-/]*)/([a-zA-Z0-9.-/]+))"};
-
-        std::smatch matchResults;
-
-        if (std::regex_match(path, matchResults, splitPathRegex)) {
-            return {matchResults[1].str(), matchResults[2].str()};
-        }
-        assert(false);
-        return {};
-    }
-}
+//namespace {
+//    std::pair<std::string, std::string> splitPath(const std::string &path) {
+//        static const std::regex splitPathRegex{
+//                R"(([a-zA-Z0-9.-/]*)/([a-zA-Z0-9.-/]+))"};
+//
+//        std::smatch matchResults;
+//
+//        if (std::regex_match(path, matchResults, splitPathRegex)) {
+//            return {matchResults[1].str(), matchResults[2].str()};
+//        }
+//        return {};
+//    }
+//}
 
 void parseStartLine(const std::string &line, RequestHTTP &request) {
 
+//    static const std::regex startLineRegex{
+//            R"((GET|HEAD) ([a-zA-Z0-9.-/]+) HTTP/1.1\r\n)"};
     static const std::regex startLineRegex{
-            R"((GET|HEAD) ([a-zA-Z0-9.-/]+) HTTP/1.1\r\n)"};
+            R"((\w+) ([a-zA-Z0-9.-/]+) HTTP/1.1\r\n)"};
 
     std::smatch matchResults;
 
     if (std::regex_match(line, matchResults, startLineRegex)) {
-        request.setStartLine(matchResults[1].str(), matchResults[2].str());
+        std::string method = matchResults[1].str();
+        if (method == "GET" || method == "HEAD") {
+            request.setStartLine(matchResults[1].str(), matchResults[2].str());
+        }
+        else {
+            throw ExceptionResponse(NOT_IMPLEMENTED, "Not implemented functionality");
+        }
     }
     else {
         std::cout << "PARSING ERROR1!'" << line << "'" << std::endl;
-        assert(false);
+        throw ExceptionResponse(USER_ERROR, "Not accepted format - request line");
     }
 }
 
 void parseHeaderField(const std::string &line, RequestHTTP &request) {
     static const std::regex headerFieldRegex{
-            R"((\w+): *(\w*) *)"};
+            R"(([\w\-]+): *([\w0-9/\-]*) *)"};
     std::smatch matchResults;
 
     if (std::regex_match(line, matchResults, headerFieldRegex)) {
@@ -44,14 +51,14 @@ void parseHeaderField(const std::string &line, RequestHTTP &request) {
     }
     else {
         std::cout << "PARSING ERROR!2'" << line << "'" << std::endl;
-        assert(false);
+        throw ExceptionResponse(USER_ERROR, "Not accepted format - header field");
     }
 }
 
 
 bool parseMultiHeaderFields(const std::string &line, RequestHTTP &request) {
     static const std::regex headerFieldsRegex{
-            R"(([\w: ]+)?\r\n)"};
+            R"(([\w: -\/]+)?\r\n)"};
 
     std::smatch matchResults;
 
@@ -83,7 +90,7 @@ bool parseMultiHeaderFields(const std::string &line, RequestHTTP &request) {
     }
     else {
         std::cout << "PARSING ERROR!2'" << line << "'" << std::endl;
-        assert(false);
+        throw ExceptionResponse(USER_ERROR, "Not accepted format - header fields");
     }
 
     return true;
@@ -94,7 +101,6 @@ std::pair<std::string, std::string> getUntilCRLF(const std::string &line) {
     if (position != std::string::npos) {
         return {line.substr(0, position + 2), line.substr(position + 2)};
     }
-//    assert(false);
     return {"", line};
 }
 

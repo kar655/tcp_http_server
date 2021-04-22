@@ -12,15 +12,8 @@
 #define BUFFER_SIZE   2000
 #define QUEUE_LENGTH     5
 
-#define SUCCESS 200
-#define MOVED 302
-#define USER_ERROR 400
-#define NOT_FOUND 404
-#define SERVER_ERROR 500
-#define NOT_IMPLEMENTED 501
 
 //#define syserr printf
-
 
 #include <errno.h>
 #include <stdarg.h>
@@ -130,9 +123,22 @@ int main(int argc, char *argv[]) {
                 bufferCollector.getNewPortion(buffer);
 
                 while (!bufferCollector.empty() && !bufferCollector.isIncomplete()) {
-                    while (bufferCollector.tryParseRequest(currentRequest)) {
-                        std::cout << "LOOP" << std::endl;
+                    try {
+                        while (bufferCollector.tryParseRequest(currentRequest)) {
+                            std::cout << "LOOP" << std::endl;
+                        }
+                    } catch (const ExceptionResponse &exceptionResponse) {
+                        std::cout << "got excetpion " << exceptionResponse.what();
+                        snd_len = write(msg_sock, exceptionResponse.what(), exceptionResponse.size());
+                        if (snd_len != exceptionResponse.size())
+                            syserr("exception writing");
+
+                        // todo nwm czy to ok
+                        currentRequest = RequestHTTP();
+                        bufferCollector.resetCurrentStep();
+                        break;
                     }
+
                     std::cout << "Out of loop!" << std::endl;
                     if (currentRequest.messageBodyReady()) {
                         bufferCollector.resetCurrentStep();
@@ -150,10 +156,6 @@ int main(int argc, char *argv[]) {
                     }
                 }
                 bufferCollector.resetIncomplete();
-
-//                snd_len = write(msg_sock, buffer, len);
-//                if (snd_len != len)
-//                    syserr("writing to client socket");
             }
             std::cout << "len > 0 === " << (len > 0) << std::endl;
         } while (len > 0);

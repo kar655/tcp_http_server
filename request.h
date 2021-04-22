@@ -8,6 +8,32 @@
 #include <fstream>
 #include "CorrelatedServer.h"
 
+#define SUCCESS 200
+#define MOVED 302
+#define USER_ERROR 400
+#define NOT_FOUND 404
+#define SERVER_ERROR 500
+#define NOT_IMPLEMENTED 501
+
+class ExceptionResponse : std::exception {
+private:
+    std::string response;
+public:
+    explicit ExceptionResponse(int code, const std::string &reason) : response("HTTP/1.1 ") {
+        response += std::to_string(code);
+        response += " ";
+        response += reason;
+        response += "\r\n";
+    }
+
+    size_t size() const noexcept {
+        return response.length();
+    }
+
+    const char *what() const noexcept override {
+        return response.c_str();
+    }
+};
 
 class RequestHandler;
 
