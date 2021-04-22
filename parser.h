@@ -35,6 +35,7 @@ public:
     void resetIncomplete();
     void setIncomplete();
     bool isIncomplete() const;
+    void clear();
 };
 
 void parseStartLine(const std::string &line, RequestHTTP &request);

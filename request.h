@@ -16,11 +16,14 @@
 #define SERVER_ERROR 500
 #define NOT_IMPLEMENTED 501
 
-class ExceptionResponse : std::exception {
-private:
+
+class ExceptionResponse : public std::exception {
+protected:
+    const int code;
     std::string response;
 public:
-    explicit ExceptionResponse(int code, const std::string &reason) : response("HTTP/1.1 ") {
+    explicit ExceptionResponse(int code, const std::string &reason)
+            : code(code), response("HTTP/1.1 ") {
         response += std::to_string(code);
         response += " ";
         response += reason;
@@ -33,6 +36,20 @@ public:
 
     const char *what() const noexcept override {
         return response.c_str();
+    }
+
+//    int getCode() const noexcept {
+//        return code;
+//    }
+};
+
+class ExceptionResponseServerSide : public ExceptionResponse {};
+
+class ExceptionResponseUserSide : public ExceptionResponse {
+public:
+    ExceptionResponseUserSide(const std::string &reason)
+            : ExceptionResponse(USER_ERROR, reason) {
+        response += "Connection: close\r\n";
     }
 };
 
@@ -63,7 +80,7 @@ public:
         auto iter = headerFields.find(name);
 
         if (iter != headerFields.end()) {
-            throw ExceptionResponse(400, "Duplicated header field");
+            throw ExceptionResponseUserSide("Duplicated header field");
         }
 
         headerFields[std::move(name)] = value;

@@ -31,7 +31,7 @@ void parseStartLine(const std::string &line, RequestHTTP &request) {
 //        if (method == "GET" || method == "HEAD") {
         std::string target = matchResults[2].str();
         if (target.empty() || target[0] != '/') {
-            throw ExceptionResponse(USER_ERROR, "Not accepted format - target path");
+            throw ExceptionResponseUserSide("Not accepted format - target path");
         }
         request.setStartLine(matchResults[1].str(), std::move(target));
 //        }
@@ -41,7 +41,7 @@ void parseStartLine(const std::string &line, RequestHTTP &request) {
     }
     else {
         std::cout << "PARSING ERROR1!'" << line << "'" << std::endl;
-        throw ExceptionResponse(USER_ERROR, "Not accepted format - request line");
+        throw ExceptionResponseUserSide("Not accepted format - request line");
     }
 }
 
@@ -55,7 +55,7 @@ void parseHeaderField(const std::string &line, RequestHTTP &request) {
     }
     else {
         std::cout << "PARSING ERROR!2'" << line << "'" << std::endl;
-        throw ExceptionResponse(USER_ERROR, "Not accepted format - header field");
+        throw ExceptionResponseUserSide("Not accepted format - header field");
     }
 }
 
@@ -94,7 +94,7 @@ bool parseMultiHeaderFields(const std::string &line, RequestHTTP &request) {
     }
     else {
         std::cout << "PARSING ERROR!2'" << line << "'" << std::endl;
-        throw ExceptionResponse(USER_ERROR, "Not accepted format - header fields");
+        throw ExceptionResponseUserSide("Not accepted format - header fields");
     }
 
     return true;
@@ -202,5 +202,11 @@ void BufferCollector::setIncomplete() {
 
 bool BufferCollector::isIncomplete() const {
     return incomplete;
+}
+
+void BufferCollector::clear() {
+    buffer.clear();
+    resetCurrentStep();
+    resetIncomplete();
 }
 

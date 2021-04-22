@@ -65,7 +65,6 @@ int main(int argc, char *argv[]) {
     std::cout << "Using port " << port << std::endl;
 
 
-    std::string collectedBuffer;
     BufferCollector bufferCollector;
     RequestHTTP currentRequest;
     // ------------------------- TCP CONNECTION ---------------------------
@@ -106,59 +105,69 @@ int main(int argc, char *argv[]) {
         msg_sock = accept(sock, (struct sockaddr *) &client_address, &client_address_len);
         if (msg_sock < 0)
             syserr("accept");
-        do {
-            memset(buffer, 0, sizeof(buffer));
-            len = read(msg_sock, buffer, sizeof(buffer) - 1);
-            if (len < 0) {
-                syserr("reading from client socket");
-            }
-            else if (len == 0) {
-                std::cout << "len == 0" << std::endl;
+        try {
+            do {
+                memset(buffer, 0, sizeof(buffer));
+                len = read(msg_sock, buffer, sizeof(buffer) - 1);
+                if (len < 0) {
+                    syserr("reading from client socket");
+                }
+                else if (len == 0) {
+                    std::cout << "len == 0" << std::endl;
 //                break;
-            }
-            else {
-                printf("read from socket: %zd bytes\n", len);
+                }
+                else {
+                    printf("read from socket: %zd bytes\n", len);
 //                printf("%.*s\n", (int) len, buffer);
 
-                bufferCollector.getNewPortion(buffer);
+                    bufferCollector.getNewPortion(buffer);
 
-                while (!bufferCollector.empty() && !bufferCollector.isIncomplete()) {
-                    try {
-                        while (bufferCollector.tryParseRequest(currentRequest)) {
-                            std::cout << "LOOP" << std::endl;
+                    while (!bufferCollector.empty() && !bufferCollector.isIncomplete()) {
+                        try {
+                            while (bufferCollector.tryParseRequest(currentRequest)) {
+                                std::cout << "LOOP" << std::endl;
+                            }
+                        } catch (const ExceptionResponseServerSide &exceptionResponse) {
+                            std::cout << "got exception " << exceptionResponse.what();
+                            snd_len = write(msg_sock, exceptionResponse.what(), exceptionResponse.size());
+                            if (snd_len != exceptionResponse.size())
+                                syserr("exception writing");
+
+                            // todo nwm czy to ok
+                            currentRequest = RequestHTTP();
+                            bufferCollector.resetCurrentStep();
+                            break;
                         }
-                    } catch (const ExceptionResponse &exceptionResponse) {
-                        std::cout << "got excetpion " << exceptionResponse.what();
-                        snd_len = write(msg_sock, exceptionResponse.what(), exceptionResponse.size());
-                        if (snd_len != exceptionResponse.size())
-                            syserr("exception writing");
 
-                        // todo nwm czy to ok
-                        currentRequest = RequestHTTP();
-                        bufferCollector.resetCurrentStep();
-                        break;
+                        std::cout << "Out of loop!" << std::endl;
+                        if (currentRequest.messageBodyReady()) {
+                            bufferCollector.resetCurrentStep();
+                            std::cout << "READY!" << std::endl << currentRequest << std::endl;
+                            RequestHandler request(currentRequest);
+                            std::string response = request.prepareResponse(correlatedServer, folderPath);
+
+                            std::cout << "RESPONSE: '''" << response << "'''" << std::endl;
+
+                            snd_len = write(msg_sock, response.c_str(), response.size());
+                            if (snd_len != response.size())
+                                syserr("writing to client socket");
+
+                            currentRequest = RequestHTTP();
+                        }
                     }
-
-                    std::cout << "Out of loop!" << std::endl;
-                    if (currentRequest.messageBodyReady()) {
-                        bufferCollector.resetCurrentStep();
-                        std::cout << "READY!" << std::endl << currentRequest << std::endl;
-                        RequestHandler request(currentRequest);
-                        std::string response = request.prepareResponse(correlatedServer, folderPath);
-
-                        std::cout << "RESPONSE: '''" << response << "'''" << std::endl;
-
-                        snd_len = write(msg_sock, response.c_str(), response.size());
-                        if (snd_len != response.size())
-                            syserr("writing to client socket");
-
-                        currentRequest = RequestHTTP();
-                    }
+                    bufferCollector.resetIncomplete();
                 }
-                bufferCollector.resetIncomplete();
-            }
-            std::cout << "len > 0 === " << (len > 0) << std::endl;
-        } while (len > 0);
+                std::cout << "len > 0 === " << (len > 0) << std::endl;
+            } while (len > 0);
+        } catch (const ExceptionResponseUserSide &exceptionResponse) {
+            bufferCollector.clear();
+            currentRequest = RequestHTTP();
+            std::cerr << "USER SIDE ERROR ================= CLOSING CONNECTION" << std::endl;
+            std::cout << "got exception " << exceptionResponse.what();
+            snd_len = write(msg_sock, exceptionResponse.what(), exceptionResponse.size());
+            if (snd_len != exceptionResponse.size())
+                syserr("exception writing");
+        }
         std::cout << "ending connection\n";
         if (close(msg_sock) < 0)
             syserr("close");
