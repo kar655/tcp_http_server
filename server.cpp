@@ -4,36 +4,20 @@
 #include <netinet/in.h>
 #include <unistd.h>
 #include <filesystem>
+#include <regex>
+#include <cassert>
 #include "CorrelatedServer.h"
 #include "parser.h"
-#include <regex>
 #include "responses.h"
 #include "request.h"
 
 #define BUFFER_SIZE   2000
 #define QUEUE_LENGTH     5
 
+#define syserr(...) exit(1)
 
 namespace fs = std::filesystem;
 
-//#define syserr printf
-
-#include <errno.h>
-#include <stdarg.h>
-#include <stdio.h>
-#include <string.h>
-
-void syserr(const char *fmt, ...) {
-    va_list fmt_args;
-    int errno1 = errno;
-
-    fprintf(stderr, "ERROR: ");
-    va_start(fmt_args, fmt);
-    vfprintf(stderr, fmt, fmt_args);
-    va_end(fmt_args);
-    fprintf(stderr, " (%d; %s)\n", errno1, strerror(errno1));
-    exit(EXIT_FAILURE);
-}
 
 int main(int argc, char *argv[]) {
     if (argc != 3 && argc != 4) {
@@ -145,20 +129,8 @@ int main(int argc, char *argv[]) {
                     bufferCollector.getNewPortion(readBuffer);
 
                     while (!bufferCollector.empty() && !bufferCollector.isIncomplete()) {
-                        try {
-                            while (bufferCollector.tryParseRequest(currentRequest)) {
-                                std::cout << "LOOP" << std::endl;
-                            }
-                        } catch (const ExceptionResponseServerSide &exceptionResponse) {
-                            std::cout << "got exception " << exceptionResponse.what();
-                            snd_len = write(msg_sock, exceptionResponse.what(), exceptionResponse.size());
-                            if (snd_len != exceptionResponse.size())
-                                syserr("exception writing");
-
-                            // todo nwm czy to ok
-                            currentRequest = RequestHTTP();
-                            bufferCollector.resetCurrentStep();
-                            break;
+                        while (bufferCollector.tryParseRequest(currentRequest)) {
+                            std::cout << "LOOP" << std::endl;
                         }
 
                         std::cout << "Out of loop!" << std::endl;
@@ -171,7 +143,7 @@ int main(int argc, char *argv[]) {
 //                            std::cout << "RESPONSE: '''" << response << "'''" << std::endl;
 
                             snd_len = write(msg_sock, response.c_str(), response.size());
-                            if (snd_len != response.size()) {
+                            if (snd_len == -1 || static_cast<size_t>(snd_len) != response.size()) {
 //                                syserr("writing to client socket");
                                 throw CloseConnection();
                             }
@@ -193,7 +165,7 @@ int main(int argc, char *argv[]) {
             std::cerr << "USER SIDE ERROR ================= CLOSING CONNECTION" << std::endl;
             std::cout << "got exception " << exceptionResponse.what();
             snd_len = write(msg_sock, exceptionResponse.what(), exceptionResponse.size());
-            if (snd_len != exceptionResponse.size())
+            if (snd_len == -1 || static_cast<size_t>(snd_len) != exceptionResponse.size())
                 syserr("exception writing");
         } catch (const CloseConnection &closeConnection) {
             bufferCollector.clear();

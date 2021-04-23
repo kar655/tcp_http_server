@@ -24,19 +24,17 @@ namespace fs = std::filesystem;
 class CloseConnection : public std::exception {
 };
 
-class ExceptionResponse : public std::exception {
-protected:
-    const int code;
+class ExceptionResponseUserSide : public std::exception {
+private:
     std::string response;
 public:
-    explicit ExceptionResponse(int code, const std::string &reason,
-                               const std::string &append = "\r\n")
-            : code(code), response("HTTP/1.1 ") {
-        response += std::to_string(code);
+    ExceptionResponseUserSide(const std::string &reason) : response("HTTP/1.1 ") {
+        response += std::to_string(USER_ERROR);
         response += " ";
         response += reason;
         response += "\r\n";
-        response += append;
+        response += "Connection: close\r\n";
+        response += "\r\n";
     }
 
     size_t size() const noexcept {
@@ -45,22 +43,6 @@ public:
 
     const char *what() const noexcept override {
         return response.c_str();
-    }
-
-//    int getCode() const noexcept {
-//        return code;
-//    }
-};
-
-class ExceptionResponseServerSide : public ExceptionResponse {
-};
-
-class ExceptionResponseUserSide : public ExceptionResponse {
-public:
-    ExceptionResponseUserSide(const std::string &reason)
-            : ExceptionResponse(USER_ERROR, reason, "") {
-        response += "Connection: close\r\n";
-        response += "\r\n";
     }
 };
 
