@@ -81,7 +81,7 @@ private:
         });
     }
 
-    bool isHandled(const std::string &field) const {
+    static bool isHandled(const std::string &field) {
         return handled.find(field) != handled.end();
     }
 
@@ -91,7 +91,7 @@ public:
         this->target = std::move(passedTarget);
     }
 
-    void addHeaderField(std::string name, const std::string &value) {
+    void addHeaderField(std::string name, std::string value) {
         stringToLowercase(name);
         if (!isHandled(name)) {
             return;
@@ -107,24 +107,11 @@ public:
             throw ExceptionResponseUserSide("Content-length non 0");
         }
 
-        headerFields[std::move(name)] = value;
-    }
-
-    void addMessageBody(const std::string &body) {
-        messageBody += body;
-    }
-
-    size_t messageBodyLength() {
-        auto iter = headerFields.find("content-length");
-        return iter != headerFields.end() ? std::stoi(iter->second) : 0;
-    }
-
-    size_t missingMessageBodyLength() {
-        return messageBodyLength() - messageBody.length();
+        headerFields.emplace(std::move(name), std::move(value));
     }
 
     bool messageBodyReady() {
-        return readAllFields && missingMessageBodyLength() == 0;
+        return readAllFields;
     }
 
     void setReadAllFields() {
@@ -148,7 +135,6 @@ private:
     std::string response;
 
     static bool isSubPath(const fs::path &basePath, const fs::path &subPath) {
-//        return std::search(subPath.begin(), subPath.end(), basePath.begin(), basePath.end()) != subPath.end();
         return std::equal(basePath.begin(), basePath.end(), subPath.begin());
     }
 
@@ -209,25 +195,18 @@ public:
                 response += "\r\n";
                 return response;
             }
+
             response += "200 OK\r\n";
             response += "Content-Type: application/octet-stream\r\n";
             response += "Content-length: ";
             response += std::to_string(fileContent.length());
             response += "\r\n";
-
-//            if (requestHttp.isClosing()) {
-//                response += "connection: close\r\n";
-//            }
-
-//            if (requestHttp.method == "GET") {
-////                response += "message body: ";
-//                response += fileContent;
-//            }
         }
 
         if (requestHttp.isClosing()) {
             response += "Connection: close\r\n";
         }
+
         response += "\r\n";
 
         if (requestHttp.method == "GET") {
