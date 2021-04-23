@@ -8,7 +8,11 @@
 #include <iostream>
 #include <fstream>
 #include <utility>
+#include <filesystem>
 #include "CorrelatedServer.h"
+
+
+namespace fs = std::filesystem;
 
 #define SUCCESS 200
 #define MOVED 302
@@ -67,8 +71,7 @@ private:
     std::string method;
     std::string target;
     std::unordered_map<std::string, std::string> headerFields;
-    const std::unordered_set<std::string> handled =
-            {"connection", "content-type", "content-length", "server"};
+    static const std::unordered_set<std::string> handled;
     std::string messageBody;
     bool readAllFields = false;
 
@@ -98,6 +101,10 @@ public:
 
         if (iter != headerFields.end()) {
             throw ExceptionResponseUserSide("Duplicated header field");
+        }
+
+        if (name == "content-length" && value != "0") {
+            throw ExceptionResponseUserSide("Content-length non 0");
         }
 
         headerFields[std::move(name)] = value;
@@ -140,12 +147,18 @@ private:
     const RequestHTTP &requestHttp;
     std::string response;
 
+    static bool isSubPath(const fs::path &basePath, const fs::path &subPath) {
+//        return std::search(subPath.begin(), subPath.end(), basePath.begin(), basePath.end()) != subPath.end();
+        return std::equal(basePath.begin(), basePath.end(), subPath.begin());
+    }
+
 public:
     explicit RequestHandler(const RequestHTTP &requestHttp)
             : statusCode(0), requestHttp(requestHttp), response("HTTP/1.1 ") {}
 
     std::string prepareResponse(const CorrelatedServer &correlatedServer,
-                                const std::string &folderPath) {
+                                const std::string &folderPath,
+                                const fs::path &realPath) {
         if (requestHttp.method != "GET" && requestHttp.method != "HEAD") {
             response += std::to_string(NOT_IMPLEMENTED);
             response += " Not implemented functionality\r\n\r\n";
@@ -157,7 +170,20 @@ public:
         std::cout << "Trying to open path: " << filePath << std::endl;
         std::ifstream file(filePath);
 
-        if (!file.is_open() || !file.good()) {
+        fs::path targetPath(requestHttp.target);
+        std::cout << "targetPath: " << targetPath << std::endl;
+        fs::path realFilePath = realPath;
+        realFilePath += targetPath;
+        std::cout << "realFilePath = " << realFilePath << std::endl;
+        std::error_code errorCode;
+        realFilePath = fs::canonical(realFilePath, errorCode);
+        std::cout << "after canonical realFilePath = " << realFilePath
+                  << "\t error_code = " << errorCode << std::endl;
+
+        bool isSub = isSubPath(realPath, realFilePath);
+        std::cout << "isSubPath = " << isSub << std::endl;
+
+        if (!file.is_open() || !file.good() || !isSub || errorCode) {
             std::string parsedServer = correlatedServer.findResource(requestHttp.target);
             if (parsedServer.empty()) {
                 response += "404 Not found\r\n";

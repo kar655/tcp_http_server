@@ -53,7 +53,8 @@ int main(int argc, char *argv[]) {
 //
 //
 ////    std::error_code errorCode;
-//    fs::path sourcesPath = fs::canonical(argv[1]);
+    fs::path sourcesPath = fs::canonical(argv[1]);
+    std::cout << "sourcesPath = " << sourcesPath << std::endl;
 ////    std::cout << "File path: " << sourcesPath << std::endl;
 ////    if (errorCode) {
 ////        std::cerr << "Can't read file " << argv[2] << std::endl;
@@ -139,7 +140,9 @@ int main(int argc, char *argv[]) {
                     printf("read from socket: %zd bytes\n", len);
 //                printf("%.*s\n", (int) len, buffer);
 
-                    bufferCollector.getNewPortion(buffer);
+                    std::string readBuffer(buffer, len);
+                    std::cout << "size() / len === " << readBuffer.size() << " / " << len << std::endl;
+                    bufferCollector.getNewPortion(readBuffer);
 
                     while (!bufferCollector.empty() && !bufferCollector.isIncomplete()) {
                         try {
@@ -163,13 +166,15 @@ int main(int argc, char *argv[]) {
                             bufferCollector.resetCurrentStep();
                             std::cout << "READY!" << std::endl << currentRequest << std::endl;
                             RequestHandler request(currentRequest);
-                            std::string response = request.prepareResponse(correlatedServer, folderPath);
+                            std::string response = request.prepareResponse(correlatedServer, folderPath, sourcesPath);
 
-                            std::cout << "RESPONSE: '''" << response << "'''" << std::endl;
+//                            std::cout << "RESPONSE: '''" << response << "'''" << std::endl;
 
                             snd_len = write(msg_sock, response.c_str(), response.size());
-                            if (snd_len != response.size())
-                                syserr("writing to client socket");
+                            if (snd_len != response.size()) {
+//                                syserr("writing to client socket");
+                                throw CloseConnection();
+                            }
 
                             if (currentRequest.isClosing()) {
                                 std::cout << "======closing connection as requested======" << std::endl;
