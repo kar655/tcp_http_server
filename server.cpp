@@ -4,20 +4,22 @@
 #include <netinet/in.h>
 #include <unistd.h>
 #include <filesystem>
-#include <regex>
-#include <cassert>
 #include "correlatedServer.h"
 #include "parser.h"
 #include "responses.h"
 #include "requests.h"
 
-#define BUFFER_SIZE   2000
+#define BUFFER_SIZE   5000
 #define QUEUE_LENGTH     5
-
-#define syserr(...) exit(1)
 
 namespace fs = std::filesystem;
 
+namespace {
+    void errorExit(std::string message) {
+        std::cerr << message << std::endl;
+        exit(EXIT_FAILURE);
+    }
+}
 
 int main(int argc, char *argv[]) {
     if (argc != 3 && argc != 4) {
@@ -27,29 +29,21 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    // Directory with sources
-    DIR *sources = opendir(argv[1]);
-    std::string folderPath(argv[1]);
-    if (sources == nullptr) {
+    std::error_code errorCode;
+    fs::path folderPath = fs::canonical(argv[1], errorCode);
+
+    std::cout << "sourcesPath = " << folderPath << std::endl;
+
+    if (errorCode) {
+        std::cerr << "Can't get file real path " << argv[1] << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    fs::directory_entry serverDirectory(folderPath);
+    if (!serverDirectory.exists() || !serverDirectory.is_directory()) {
         std::cerr << "Can't open directory " << argv[1] << std::endl;
         return EXIT_FAILURE;
     }
-//
-//
-////    std::error_code errorCode;
-    fs::path sourcesPath = fs::canonical(argv[1]);
-    std::cout << "sourcesPath = " << sourcesPath << std::endl;
-////    std::cout << "File path: " << sourcesPath << std::endl;
-////    if (errorCode) {
-////        std::cerr << "Can't read file " << argv[2] << std::endl;
-////        return EXIT_FAILURE;
-////    }
-//
-//    fs::directory_entry serverDirectory(sourcesPath);
-//    if (!serverDirectory.exists() || !serverDirectory.is_directory()) {
-//        std::cerr << "Can't open directory " << argv[1] << std::endl;
-//        return EXIT_FAILURE;
-//    }
 
 
     std::fstream correlated_servers;
@@ -66,6 +60,7 @@ int main(int argc, char *argv[]) {
     if (argc == 4) {
         port = std::stoi(argv[3]);
     }
+
     std::cout << "Using port " << port << std::endl;
 
 
@@ -83,7 +78,7 @@ int main(int argc, char *argv[]) {
 
     sock = socket(PF_INET, SOCK_STREAM, 0); // creating IPv4 TCP socket
     if (sock < 0)
-        syserr("socket");
+        errorExit("socket");
 
     // after socket() call; we should close(sock) on any execution path;
     // since all execution paths exit immediately, sock would be closed when program terminates
@@ -94,13 +89,13 @@ int main(int argc, char *argv[]) {
 
     // bind the socket to a concrete address
     if (bind(sock, (struct sockaddr *) &server_address, sizeof(server_address)) < 0)
-        syserr("bind");
+        errorExit("Couldn't bind");
 
 //     switch to listening (passive open)
     if (listen(sock, QUEUE_LENGTH) < 0)
-        syserr("listen");
+        errorExit("Couldn't set listen on socket");
 
-    printf("accepting client connections on port %hu\n", ntohs(server_address.sin_port));
+    std::cout << "Accepting client connections on port " << ntohs(server_address.sin_port) << std::endl;
 
     int xd = 1000; // TODO
     while (xd++ > 0) {
@@ -108,43 +103,33 @@ int main(int argc, char *argv[]) {
         // get client connection from the socket
         msg_sock = accept(sock, (struct sockaddr *) &client_address, &client_address_len);
         if (msg_sock < 0)
-            syserr("accept");
+            errorExit("accept");
         try {
             do {
-                memset(buffer, 0, sizeof(buffer));
-                len = read(msg_sock, buffer, sizeof(buffer) - 1);
+                len = read(msg_sock, buffer, sizeof(buffer));
                 if (len < 0) {
-                    syserr("reading from client socket");
+                    errorExit("reading from client socket");
                 }
                 else if (len == 0) {
-                    std::cout << "len == 0" << std::endl;
-//                break;
+                    break;
                 }
                 else {
                     printf("read from socket: %zd bytes\n", len);
-//                printf("%.*s\n", (int) len, buffer);
 
                     std::string readBuffer(buffer, len);
-                    std::cout << "size() / len === " << readBuffer.size() << " / " << len << std::endl;
                     bufferCollector.getNewPortion(readBuffer);
 
                     while (!bufferCollector.empty() && !bufferCollector.isIncomplete()) {
-                        while (bufferCollector.tryParseRequest(currentRequest)) {
-                            std::cout << "LOOP" << std::endl;
-                        }
+                        while (bufferCollector.tryParseRequest(currentRequest)) {}
 
-                        std::cout << "Out of loop!" << std::endl;
                         if (currentRequest.messageBodyReady()) {
                             bufferCollector.resetCurrentStep();
-                            std::cout << "READY!" << std::endl << currentRequest << std::endl;
                             RequestHandler request(currentRequest);
-                            std::string response = request.prepareResponse(correlatedServer, folderPath, sourcesPath);
 
-//                            std::cout << "RESPONSE: '''" << response << "'''" << std::endl;
+                            std::string response = request.prepareResponse(correlatedServer, folderPath);
 
                             snd_len = write(msg_sock, response.c_str(), response.size());
                             if (snd_len == -1 || static_cast<size_t>(snd_len) != response.size()) {
-//                                syserr("writing to client socket");
                                 throw CloseConnection();
                             }
 
@@ -157,7 +142,6 @@ int main(int argc, char *argv[]) {
                     }
                     bufferCollector.resetIncomplete();
                 }
-                std::cout << "len > 0 === " << (len > 0) << std::endl;
             } while (len > 0);
         } catch (const ExceptionResponseUserSide &exceptionResponse) {
             bufferCollector.clear();
@@ -166,17 +150,18 @@ int main(int argc, char *argv[]) {
             std::cout << "got exception " << exceptionResponse.what();
             snd_len = write(msg_sock, exceptionResponse.what(), exceptionResponse.size());
             if (snd_len == -1 || static_cast<size_t>(snd_len) != exceptionResponse.size())
-                syserr("exception writing");
+                errorExit("exception writing");
         } catch (const CloseConnection &closeConnection) {
             bufferCollector.clear();
             currentRequest = RequestHTTP();
         }
-        std::cout << "ending connection\n";
+
+        std::cout << "ending connection" << std::endl;
+
         if (close(msg_sock) < 0)
-            syserr("close");
+            errorExit("close");
     }
 
-    closedir(sources);
     correlated_servers.close();
 
     return 0;

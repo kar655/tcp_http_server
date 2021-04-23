@@ -82,8 +82,7 @@ public:
             : statusCode(0), requestHttp(requestHttp), response("HTTP/1.1 ") {}
 
     std::string prepareResponse(const CorrelatedServer &correlatedServer,
-                                const std::string &folderPath,
-                                const fs::path &realPath);
+                                const fs::path &folderPath);
 };
 
 #endif //ZAD1CPP_REQUESTS_H
