@@ -2,7 +2,7 @@
 #define ZAD1CPP_PARSER_H
 
 #include <string>
-#include "request.h"
+#include "requests.h"
 
 
 class BufferCollector {

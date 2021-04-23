@@ -6,10 +6,12 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_C_FLAGS "-g -Wall -Wextra std=c++17")
 
 
-add_executable(zad1cpp server.cpp CorrelatedServer.h
+add_executable(zad1cpp server.cpp
+        correlatedServer.cpp correlatedServer.h
         parser.cpp parser.h
         responses.cpp responses.h
-        request.cpp request.h)
+        requests.cpp requests.h
+        httpExceptions.h)
 
 add_executable(test test.cpp
         parser.cpp parser.h)

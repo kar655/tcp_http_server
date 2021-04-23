@@ -6,10 +6,10 @@
 #include <filesystem>
 #include <regex>
 #include <cassert>
-#include "CorrelatedServer.h"
+#include "correlatedServer.h"
 #include "parser.h"
 #include "responses.h"
-#include "request.h"
+#include "requests.h"
 
 #define BUFFER_SIZE   2000
 #define QUEUE_LENGTH     5
