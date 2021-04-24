@@ -85,6 +85,8 @@ private:
         response += "\r\n";
     }
 
+    void checkInCorrelated(const CorrelatedServer &correlatedServer);
+
 public:
     explicit RequestHandler(const RequestHTTP &requestHttp)
             : statusCode(0), reason(), requestHttp(requestHttp), response("HTTP/1.1 ") {}

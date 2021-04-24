@@ -64,21 +64,7 @@ std::string RequestHandler::prepareResponse(const CorrelatedServer &correlatedSe
     std::ifstream file(realFilePath);
 
     if (!file.is_open() || !file.good() || !isSub || errorCode) {
-        std::string parsedServer = correlatedServer.findResource(requestHttp.target);
-        if (parsedServer.empty()) {
-            statusCode = NOT_FOUND;
-            reason = "Not found";
-            addStatusLineToResponse();
-        }
-        else {
-            statusCode = MOVED;
-            reason = "Moved";
-            addStatusLineToResponse();
-
-            response += "location: ";
-            response += parsedServer;
-            response += "\r\n";
-        }
+        checkInCorrelated(correlatedServer);
     }
     else {
         // Read whole file
@@ -86,10 +72,7 @@ std::string RequestHandler::prepareResponse(const CorrelatedServer &correlatedSe
             fileContent = std::string(std::istreambuf_iterator<char>(file), {});
         }
         catch (...) {
-            // TODO czy nie powinienem sprawdzic w corelated?
-            statusCode = NOT_FOUND;
-            reason = "Can't open directory";
-            addStatusLineToResponse();
+            checkInCorrelated(correlatedServer);
 
             if (requestHttp.isClosing()) {
                 response += "connection: close\r\n";
@@ -123,4 +106,22 @@ std::string RequestHandler::prepareResponse(const CorrelatedServer &correlatedSe
 
 std::ostream &operator<<(std::ostream &os, const RequestHandler &request) {
     return os << request.statusCode << " " << request.reason;
+}
+
+void RequestHandler::checkInCorrelated(const CorrelatedServer &correlatedServer) {
+    std::string parsedServer = correlatedServer.findResource(requestHttp.target);
+    if (parsedServer.empty()) {
+        statusCode = NOT_FOUND;
+        reason = "Not found";
+        addStatusLineToResponse();
+    }
+    else {
+        statusCode = MOVED;
+        reason = "Moved";
+        addStatusLineToResponse();
+
+        response += "location: ";
+        response += parsedServer;
+        response += "\r\n";
+    }
 }

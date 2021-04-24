@@ -84,7 +84,7 @@ bool BufferCollector::tryParseRequest(RequestHTTP &request) {
             ++currentStep;
             request.setReadAllFields();
             buffer = splitted.second;
-            return false; // TODO YYYYY
+            return false;
         }
     }
 
@@ -120,10 +120,3 @@ void BufferCollector::setIncomplete() {
 bool BufferCollector::isIncomplete() const {
     return incomplete;
 }
-
-void BufferCollector::clear() {
-    buffer.clear();
-    resetCurrentStep();
-    resetIncomplete();
-}
-
