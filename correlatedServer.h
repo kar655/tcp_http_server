@@ -12,7 +12,7 @@ private:
     // pair <resource, parsed http>
     std::unordered_map<std::string, std::string> parsed;
 public:
-    explicit CorrelatedServer(std::fstream &file);
+    explicit CorrelatedServer(std::ifstream &file);
 
     std::string findResource(const std::string &resource) const;
 };

@@ -83,7 +83,7 @@ std::string RequestHandler::prepareResponse(const CorrelatedServer &correlatedSe
         try {
             fileContent = std::string(std::istreambuf_iterator<char>(file), {});
         }
-        catch (std::exception &exception) {
+        catch (...) {
             response += "404 Can't open directory\r\n"; // TODO czy nie powinienem sprawdzic w corelated?
             if (requestHttp.isClosing()) {
                 response += "connection: close\r\n";

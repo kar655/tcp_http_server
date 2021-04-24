@@ -1,6 +1,6 @@
 #include "correlatedServer.h"
 
-CorrelatedServer::CorrelatedServer(std::fstream &file) {
+CorrelatedServer::CorrelatedServer(std::ifstream &file) {
     std::string resource, server, port;
     while (file >> resource >> server >> port) {
         std::string parsedLine = "http://";

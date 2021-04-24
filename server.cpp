@@ -45,9 +45,7 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-
-    std::fstream correlated_servers;
-    correlated_servers.open(argv[2], std::fstream::in);
+    std::ifstream correlated_servers(argv[2]);
     if (!correlated_servers.is_open()) {
         std::cerr << "Can't read file " << argv[2] << std::endl;
         return EXIT_FAILURE;
