@@ -75,13 +75,12 @@ bool BufferCollector::tryParseRequest(RequestHTTP &request) {
         return false;
     }
 
-    if (currentStep == 0) {
+    if (isStartLine) {
         parseStartLine(splitted.first, request);
-        ++currentStep;
+        isStartLine = false;
     }
     else {
         if (!parseMultiHeaderFields(splitted.first, request)) {
-            ++currentStep;
             request.setReadAllFields();
             buffer = splitted.second;
             return false;
@@ -101,7 +100,7 @@ void BufferCollector::getNewPortion(const std::string &line) {
 }
 
 void BufferCollector::resetCurrentStep() {
-    currentStep = 0;
+    isStartLine = true;
 }
 
 bool BufferCollector::empty() const {

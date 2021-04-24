@@ -8,13 +8,13 @@
 class BufferCollector {
 private:
     std::string buffer;
-    // 0 - start line
-    // 1 - header fields
-    uint_fast8_t currentStep;
+    // true - start line
+    // false - header fields
+    bool isStartLine;
     bool incomplete;
 public:
 
-    BufferCollector() : buffer(), currentStep(0), incomplete(false) {}
+    BufferCollector() : buffer(), isStartLine(true), incomplete(false) {}
 
     bool tryParseRequest(RequestHTTP &request);
 

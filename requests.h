@@ -62,8 +62,6 @@ public:
         return iter != headerFields.end() && iter->second == "close";
     }
 
-    friend std::ostream &operator<<(std::ostream &os, const RequestHTTP &request);
-
     friend class RequestHandler;
 };
 
