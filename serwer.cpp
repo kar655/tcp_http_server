@@ -54,14 +54,14 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    std::ifstream correlated_servers(correlatedServerPath);
-    if (!correlated_servers.is_open()) {
+    std::ifstream correlatedServersFile(correlatedServerPath);
+    if (!correlatedServersFile.is_open()) {
         std::cerr << "Can't read file " << argv[2] << std::endl;
         return EXIT_FAILURE;
     }
 
-    CorrelatedServer correlatedServer(correlated_servers);
-    correlated_servers.close();
+    CorrelatedServer correlatedServer(correlatedServersFile);
+    correlatedServersFile.close();
 
     // Set port
     uint16_t port = 8080;
@@ -120,8 +120,10 @@ int main(int argc, char *argv[]) {
                     bufferCollector.getNewPortion(readBuffer);
 
                     while (!bufferCollector.empty() && !bufferCollector.isIncomplete()) {
+                        // While \r\n can be found to parse part of request
                         while (bufferCollector.tryParseRequest(currentRequest)) {}
 
+                        // If request is ready to be handled
                         if (currentRequest.messageBodyReady()) {
                             bufferCollector.resetCurrentStep();
                             RequestHandler request(currentRequest);
@@ -131,10 +133,12 @@ int main(int argc, char *argv[]) {
 
                             snd_len = write(msg_sock, response.c_str(), response.size());
                             if (snd_len == -1 || static_cast<size_t>(snd_len) != response.size()) {
+                                // Connection has been closed by client
                                 std::cout << std::endl;
                                 throw CloseConnection();
                             }
 
+                            // Connection: close has been found
                             if (currentRequest.isClosing()) {
                                 std::cout << "Closing connection as requested" << std::endl << std::endl;
                                 throw CloseConnection();
