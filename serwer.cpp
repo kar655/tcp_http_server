@@ -69,7 +69,7 @@ int main(int argc, char *argv[]) {
         port = std::stoi(argv[3]);
     }
 
-    std::cout << "Using port " << port << std::endl;
+    std::cout << "Using port " << port << std::endl << std::endl;
 
     int sock, msg_sock;
     struct sockaddr_in server_address;
