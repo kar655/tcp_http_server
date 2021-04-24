@@ -1,6 +1,5 @@
 #include <regex>
 #include <iostream>
-#include <assert.h>
 #include "parser.h"
 
 
@@ -20,7 +19,6 @@ void parseStartLine(const std::string &line, RequestHTTP &request) {
         request.setStartLine(std::move(method), std::move(target));
     }
     else {
-//        std::cout << "PARSING ERROR1!'" << line << "'" << std::endl;
         throw ExceptionResponseUserSide("Not accepted format - request line");
     }
 }
@@ -35,7 +33,6 @@ void parseHeaderField(const std::string &line, RequestHTTP &request) {
         request.addHeaderField(matchResults[1].str(), matchResults[2].str());
     }
     else {
-//        std::cout << "PARSING ERROR!2'" << line << "'" << std::endl;
         throw ExceptionResponseUserSide("Not accepted format - header field");
     }
 }
@@ -51,14 +48,12 @@ bool parseMultiHeaderFields(const std::string &line, RequestHTTP &request) {
         std::string result = matchResults[1].str();
 
         if (result.empty()) {
-//            std::cout << "empty field\n";
             return false;
         }
 
         parseHeaderField(result, request);
     }
     else {
-//        std::cout << "PARSING ERROR!2'" << line << "'" << std::endl;
         throw ExceptionResponseUserSide("Not accepted format - header fields");
     }
 
@@ -80,18 +75,12 @@ bool BufferCollector::tryParseRequest(RequestHTTP &request) {
         return false;
     }
 
-//        std::cout << "CURRENTLY PARSING '''" << splitted.first << "'''" << std::endl;
-
     if (currentStep == 0) {
         parseStartLine(splitted.first, request);
         ++currentStep;
-        std::cout << "Parsed start line" << std::endl;
     }
     else {
-        // false if it was last field (empty \r\n)
-//            std::cout << "Before multi header fields\n";
         if (!parseMultiHeaderFields(splitted.first, request)) {
-//                std::cout << "In if parseMulti..." << std::endl;
             ++currentStep;
             request.setReadAllFields();
             buffer = splitted.second;
@@ -101,7 +90,6 @@ bool BufferCollector::tryParseRequest(RequestHTTP &request) {
 
     buffer = splitted.second;
     if (buffer.empty()) {
-//            std::cout << "FOUND ALL NEEDED CRLF" << std::endl;
         return false;
     }
 

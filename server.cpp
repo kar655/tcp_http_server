@@ -93,8 +93,6 @@ int main(int argc, char *argv[]) {
     if (listen(sock, QUEUE_LENGTH) < 0)
         errorExit("Couldn't set listen on socket");
 
-    std::cout << "Accepting client connections on port " << ntohs(server_address.sin_port) << std::endl;
-
     int xd = 1000; // TODO
     while (xd++ > 0) {
         client_address_len = sizeof(client_address);
@@ -112,8 +110,6 @@ int main(int argc, char *argv[]) {
                     break;
                 }
                 else {
-                    printf("read from socket: %zd bytes\n", len);
-
                     std::string readBuffer(buffer, len);
                     bufferCollector.getNewPortion(readBuffer);
 
@@ -125,17 +121,21 @@ int main(int argc, char *argv[]) {
                             RequestHandler request(currentRequest);
 
                             std::string response = request.prepareResponse(correlatedServer, folderPath);
+                            std::cout << "Sending: " << request << std::endl;
 
                             snd_len = write(msg_sock, response.c_str(), response.size());
                             if (snd_len == -1 || static_cast<size_t>(snd_len) != response.size()) {
+                                std::cout << std::endl;
                                 throw CloseConnection();
                             }
 
                             if (currentRequest.isClosing()) {
-                                std::cout << "======closing connection as requested======" << std::endl;
+                                std::cout << "Closing connection as requested" << std::endl << std::endl;
                                 throw CloseConnection();
                             }
                             currentRequest = RequestHTTP();
+
+                            std::cout << std::endl;
                         }
                     }
                     bufferCollector.resetIncomplete();
@@ -144,8 +144,8 @@ int main(int argc, char *argv[]) {
         } catch (const ExceptionResponseUserSide &exceptionResponse) {
             bufferCollector.clear();
             currentRequest = RequestHTTP();
-            std::cerr << "USER SIDE ERROR ================= CLOSING CONNECTION" << std::endl;
-            std::cout << "got exception " << exceptionResponse.what();
+            std::cout << "Sending: 400 " << exceptionResponse.getReason() << std::endl;
+            std::cout << "User side error - closing connection" << std::endl << std::endl;
             snd_len = write(msg_sock, exceptionResponse.what(), exceptionResponse.size());
             if (snd_len == -1 || static_cast<size_t>(snd_len) != exceptionResponse.size())
                 errorExit("exception writing");
@@ -153,8 +153,6 @@ int main(int argc, char *argv[]) {
             bufferCollector.clear();
             currentRequest = RequestHTTP();
         }
-
-        std::cout << "ending connection" << std::endl;
 
         if (close(msg_sock) < 0)
             errorExit("close");

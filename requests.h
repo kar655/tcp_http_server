@@ -70,6 +70,7 @@ public:
 class RequestHandler {
 private:
     uint_fast16_t statusCode;
+    std::string reason;
     const RequestHTTP &requestHttp;
     std::string response;
 
@@ -77,12 +78,21 @@ private:
         return std::equal(basePath.begin(), basePath.end(), subPath.begin());
     }
 
+    void addStatusLineToResponse() {
+        response += std::to_string(statusCode);
+        response += " ";
+        response += reason;
+        response += "\r\n";
+    }
+
 public:
     explicit RequestHandler(const RequestHTTP &requestHttp)
-            : statusCode(0), requestHttp(requestHttp), response("HTTP/1.1 ") {}
+            : statusCode(0), reason(), requestHttp(requestHttp), response("HTTP/1.1 ") {}
 
     std::string prepareResponse(const CorrelatedServer &correlatedServer,
                                 const fs::path &folderPath);
+
+    friend std::ostream &operator<<(std::ostream &os, const RequestHandler &request);
 };
 
 #endif //ZAD1CPP_REQUESTS_H

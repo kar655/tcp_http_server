@@ -7,9 +7,10 @@ class CloseConnection : public std::exception {
 class ExceptionResponseUserSide : public std::exception {
 private:
     std::string response;
+    std::string reason;
 public:
-    explicit ExceptionResponseUserSide(const std::string &reason)
-            : response("HTTP/1.1 400 ") {
+    explicit ExceptionResponseUserSide(std::string reason)
+            : response("HTTP/1.1 400 "), reason(std::move(reason)) {
         response += reason;
         response += "\r\n";
         response += "Connection: close\r\n";
@@ -22,6 +23,10 @@ public:
 
     [[nodiscard]] const char *what() const noexcept override {
         return response.c_str();
+    }
+
+    [[nodiscard]] const std::string &getReason() const noexcept {
+        return reason;
     }
 };
 

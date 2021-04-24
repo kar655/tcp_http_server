@@ -43,35 +43,38 @@ void RequestHTTP::addHeaderField(std::string name, std::string value) {
 std::string RequestHandler::prepareResponse(const CorrelatedServer &correlatedServer,
                                             const fs::path &folderPath) {
     if (requestHttp.method != "GET" && requestHttp.method != "HEAD") {
-        response += std::to_string(NOT_IMPLEMENTED);
-        response += " Not implemented functionality\r\n\r\n";
+        statusCode = NOT_IMPLEMENTED;
+        reason = "Not implemented functionality";
+        addStatusLineToResponse();
+
+        response += "\r\n";
         return response;
     }
 
     std::string fileContent;
 
     fs::path targetPath(requestHttp.target);
-    std::cout << "targetPath: " << targetPath << std::endl;
     fs::path realFilePath = folderPath;
     realFilePath += targetPath;
-    std::cout << "realFilePath = " << realFilePath << std::endl;
     std::error_code errorCode;
     realFilePath = fs::canonical(realFilePath, errorCode);
-    std::cout << "after canonical realFilePath = " << realFilePath
-              << "\t error_code = " << errorCode << std::endl;
 
     bool isSub = isSubPath(folderPath, realFilePath);
-    std::cout << "isSubPath = " << isSub << std::endl;
 
     std::ifstream file(realFilePath);
 
     if (!file.is_open() || !file.good() || !isSub || errorCode) {
         std::string parsedServer = correlatedServer.findResource(requestHttp.target);
         if (parsedServer.empty()) {
-            response += "404 Not found\r\n";
+            statusCode = NOT_FOUND;
+            reason = "Not found";
+            addStatusLineToResponse();
         }
         else {
-            response += "302 Moved\r\n";
+            statusCode = MOVED;
+            reason = "Moved";
+            addStatusLineToResponse();
+
             response += "location: ";
             response += parsedServer;
             response += "\r\n";
@@ -79,12 +82,15 @@ std::string RequestHandler::prepareResponse(const CorrelatedServer &correlatedSe
     }
     else {
         // Read whole file
-        std::cout << "reading file??" << std::endl;
         try {
             fileContent = std::string(std::istreambuf_iterator<char>(file), {});
         }
         catch (...) {
-            response += "404 Can't open directory\r\n"; // TODO czy nie powinienem sprawdzic w corelated?
+            // TODO czy nie powinienem sprawdzic w corelated?
+            statusCode = NOT_FOUND;
+            reason = "Can't open directory";
+            addStatusLineToResponse();
+
             if (requestHttp.isClosing()) {
                 response += "connection: close\r\n";
             }
@@ -92,7 +98,10 @@ std::string RequestHandler::prepareResponse(const CorrelatedServer &correlatedSe
             return response;
         }
 
-        response += "200 OK\r\n";
+        statusCode = SUCCESS;
+        reason = "OK";
+        addStatusLineToResponse();
+
         response += "Content-Type: application/octet-stream\r\n";
         response += "Content-length: ";
         response += std::to_string(fileContent.length());
@@ -110,4 +119,8 @@ std::string RequestHandler::prepareResponse(const CorrelatedServer &correlatedSe
     }
 
     return response;
+}
+
+std::ostream &operator<<(std::ostream &os, const RequestHandler &request) {
+    return os << request.statusCode << " " << request.reason;
 }

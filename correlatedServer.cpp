@@ -9,7 +9,6 @@ CorrelatedServer::CorrelatedServer(std::ifstream &file) {
         parsedLine += port;
         parsedLine += resource;
 
-        std::cout << "Parsed: " << parsedLine << std::endl;
 
         auto iter = parsed.find(resource);
         if (iter == parsed.end()) {
